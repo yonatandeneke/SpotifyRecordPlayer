@@ -16,7 +16,7 @@ def pil_to_pygame(pil_image):
 pygame.init()
 
 WIDTH, HEIGHT = 1080, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Spotify Record Player")
 
 def load_control_images(size=(64, 64)):
@@ -42,7 +42,7 @@ def load_control_images(size=(64, 64)):
 
 controls = load_control_images(size=(80, 80))
 
-DISC_SIZE = (360, 360)
+DISC_SIZE = (WIDTH, HEIGHT)
 raw_disc = controls.get('disc')
 disc_surface = None
 if raw_disc:
