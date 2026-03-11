@@ -95,17 +95,27 @@ except Exception:
 ALBUM_ART_SIZE = int(min(WIDTH, HEIGHT) * 0.38)
 current_art_url = None
 album_art_surf = None
-vinyl_surface = None
+vinyl_frames = []
 disc_angle = 0.0
+FRAME_COUNT = 360
+
+def build_frames(vinyl_surface):
+    frames = []
+    for i in range(FRAME_COUNT):
+        angle = i * (360 / FRAME_COUNT)
+        rotated = pygame.transform.rotate(vinyl_surface, -angle)
+        frames.append(rotated)
+    return frames
 
 def refresh_vinyl():
-    global current_art_url, album_art_surf, vinyl_surface
+    global current_art_url, album_art_surf, vinyl_frames
     url = spotify.get_disc_image()
     if url and url != current_art_url:
         current_art_url = url
         album_art_surf = load_album_art(url, ALBUM_ART_SIZE)
     if disc_base:
         vinyl_surface = make_vinyl_surface(disc_base, album_art_surf, DISC_SIZE)
+        vinyl_frames = build_frames(vinyl_surface)
 
 refresh_vinyl()
 
@@ -204,8 +214,9 @@ while running:
 
     screen.fill((30, 30, 30))
 
-    if vinyl_surface:
-        rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
+    if vinyl_frames:
+        frame_idx = int(disc_angle) % FRAME_COUNT
+        rotated = vinyl_frames[frame_idx]
         rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         screen.blit(rotated, rot_rect.topleft)
 
