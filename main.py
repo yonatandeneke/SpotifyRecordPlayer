@@ -83,7 +83,11 @@ def load_control_images(size=(64, 64)):
 
 controls = load_control_images(size=(80, 80))
 
-DISC_SIZE = (WIDTH, HEIGHT)
+# --- KEY CHANGE: rotate a smaller disc surface, then scale up ---
+# Rotating 1080x1080 every frame is very slow. 600x600 is ~3x faster to rotate.
+DISC_RENDER_SIZE = 600
+DISC_SIZE = (DISC_RENDER_SIZE, DISC_RENDER_SIZE)
+
 disc_base = None
 try:
     disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
@@ -91,7 +95,7 @@ try:
 except Exception:
     disc_base = None
 
-ALBUM_ART_SIZE = int(min(WIDTH, HEIGHT) * 0.38)
+ALBUM_ART_SIZE = int(DISC_RENDER_SIZE * 0.38)
 current_art_url = None
 album_art_surf = None
 vinyl_surface = None
@@ -146,8 +150,22 @@ clock = pygame.time.Clock()
 art_refresh_timer = 0
 ART_REFRESH_INTERVAL = 5000
 
+def build_controls_bg(control_rects):
+    valid_rects = [r for r in control_rects if r]
+    if not valid_rects:
+        return None, (0, 0)
+    left   = min(r.left  for r in valid_rects) - 16
+    right  = max(r.right for r in valid_rects) + 16
+    top    = min(r.top   for r in valid_rects) - 12
+    bottom = max(r.bottom for r in valid_rects) + 12
+    bg_surf = pygame.Surface((right - left, bottom - top), pygame.SRCALPHA)
+    bg_surf.fill((0, 0, 0, 160))
+    return bg_surf, (left, top)
+
+controls_bg, controls_bg_pos = build_controls_bg(control_rects)
+
 while running:
-    dt = clock.tick(30)
+    dt = clock.tick(60)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -171,6 +189,7 @@ while running:
                             surfaces[1] = controls.get('play')
                             spotify.pause()
                         control_rects = layout_controls(surfaces, CENTER_X, CONTROL_Y, SPACING)
+                        controls_bg, controls_bg_pos = build_controls_bg(control_rects)
                     elif i == 0:
                         spotify.skip_previous()
                         refresh_vinyl()
@@ -184,26 +203,16 @@ while running:
         refresh_vinyl()
 
     if spotify.isPlaying():
-        disc_angle = (disc_angle + 4.5) % 360
-
+        disc_angle = (disc_angle + 135 * (dt / 1000)) % 360
     screen.fill((30, 30, 30))
 
     if vinyl_surface:
         rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
-        rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-        screen.blit(rotated, rot_rect.topleft)
+        scaled = pygame.transform.scale(rotated, (WIDTH, HEIGHT))
+        screen.blit(scaled, (0, 0))
 
-    valid_rects = [r for r in control_rects if r]
-    if valid_rects:
-        left   = min(r.left  for r in valid_rects) - 16
-        right  = max(r.right for r in valid_rects) + 16
-        top    = min(r.top   for r in valid_rects) - 12
-        bottom = max(r.bottom for r in valid_rects) + 12
-        bg_w = right - left
-        bg_h = bottom - top
-        bg_surf = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
-        bg_surf.fill((0, 0, 0, 160))
-        screen.blit(bg_surf, (left, top))
+    if controls_bg:
+        screen.blit(controls_bg, controls_bg_pos)
 
     for s, r in zip(surfaces, control_rects):
         if s and r:
