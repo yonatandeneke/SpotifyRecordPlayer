@@ -41,11 +41,13 @@ def make_vinyl_surface(disc_surface, album_surf, disc_size):
 
     if album_surf:
         art_size = album_surf.get_width()
-        flat = pygame.Surface((art_size, art_size))
-        flat.fill((30, 30, 30))
-        flat.blit(album_surf, (0, 0))
         x = (disc_size[0] - art_size) // 2
         y = (disc_size[1] - art_size) // 2
+        # Sample the disc color at the album art position to use as bg
+        bg_color = vinyl.get_at((x + art_size // 2, y + art_size // 2))[:3]
+        flat = pygame.Surface((art_size, art_size))
+        flat.fill(bg_color)
+        flat.blit(album_surf, (0, 0))
         vinyl.blit(flat, (x, y))
 
     center = (disc_size[0] // 2, disc_size[1] // 2)
@@ -203,7 +205,7 @@ while running:
         refresh_vinyl()
 
     if spotify.isPlaying():
-        disc_angle = (disc_angle + 135 * (dt / 1000)) % 360
+        disc_angle = (disc_angle + 33 * (dt / 1000)) % 360
 
     screen.fill((30, 30, 30))
 
