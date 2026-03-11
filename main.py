@@ -58,7 +58,7 @@ pygame.init()
 pygame.mixer.quit()
 
 WIDTH, HEIGHT = 1080, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.WINDOWMOVED)
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Spotify Record Player")
 pygame.mouse.set_visible(False)
 
