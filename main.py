@@ -87,16 +87,6 @@ def load_control_images(size=(64, 64)):
 controls = load_control_images(size=(80, 80))
 
 DISC_SIZE = (WIDTH, HEIGHT)
-        return
-    left   = min(r.left  for r in valid_rects) - 16
-    right  = max(r.right for r in valid_rects) + 16
-    top    = min(r.top   for r in valid_rects) - 12
-    bottom = max(r.bottom for r in valid_rects) + 12
-    bg_w = right - left
-    bg_h = bottom - top
-    bg = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
-    bg.fill((0, 0, 0, 160))
-    controls_bg_surf = bg
 disc_base = None
 try:
     disc_img = pygame.image.load('imgs/disc.png').convert()
