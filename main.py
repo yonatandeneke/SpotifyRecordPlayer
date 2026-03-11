@@ -43,18 +43,13 @@ def make_vinyl_surface(disc_surface, album_surf, disc_size):
         art_size = album_surf.get_width()
         x = (disc_size[0] - art_size) // 2
         y = (disc_size[1] - art_size) // 2
-        # Sample the disc color at the album art position to use as bg
-        bg_color = vinyl.get_at((x + art_size // 2, y + art_size // 2))[:3]
-        flat = pygame.Surface((art_size, art_size))
-        flat.fill(bg_color)
-        flat.blit(album_surf, (0, 0))
-        vinyl.blit(flat, (x, y))
+        vinyl.blit(album_surf, (x, y))
 
     center = (disc_size[0] // 2, disc_size[1] // 2)
     pygame.draw.circle(vinyl, (20, 20, 20), center, 18)
     pygame.draw.circle(vinyl, (40, 40, 40), center, 18, 2)
 
-    return vinyl.convert()
+    return vinyl.convert_alpha()
 
 
 pygame.init()
@@ -92,8 +87,8 @@ DISC_SIZE = (WIDTH, HEIGHT)
 
 disc_base = None
 try:
-    disc_img = pygame.image.load('imgs/disc.png').convert()
-    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE).convert()
+    disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
+    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE).convert_alpha()
 except Exception:
     disc_base = None
 
