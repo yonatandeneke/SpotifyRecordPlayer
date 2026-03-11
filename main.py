@@ -49,7 +49,7 @@ def make_vinyl_surface(disc_surface, album_surf, disc_size):
     pygame.draw.circle(vinyl, (20, 20, 20, 255), center, 18)
     pygame.draw.circle(vinyl, (40, 40, 40, 255), center, 18, 2)
 
-    return vinyl
+    return vinyl.convert()
 
 
 pygame.init()
@@ -88,7 +88,7 @@ DISC_SIZE = (WIDTH, HEIGHT)
 disc_base = None
 try:
     disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
-    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE)
+    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE).convert()
 except Exception:
     disc_base = None
 
