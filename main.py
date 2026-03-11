@@ -3,6 +3,8 @@ import spotify
 import urllib.request
 from io import BytesIO
 from PIL import Image
+import threading
+import time
 
 def pil_to_pygame(pil_image):
     if pil_image.mode != 'RGB':
@@ -56,7 +58,7 @@ pygame.init()
 pygame.mixer.quit()
 
 WIDTH, HEIGHT = 1080, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.WINDOWMOVED)
 pygame.display.set_caption("Spotify Record Player")
 pygame.mouse.set_visible(False)
 
@@ -85,9 +87,19 @@ def load_control_images(size=(64, 64)):
 controls = load_control_images(size=(80, 80))
 
 DISC_SIZE = (WIDTH, HEIGHT)
+        return
+    left   = min(r.left  for r in valid_rects) - 16
+    right  = max(r.right for r in valid_rects) + 16
+    top    = min(r.top   for r in valid_rects) - 12
+    bottom = max(r.bottom for r in valid_rects) + 12
+    bg_w = right - left
+    bg_h = bottom - top
+    bg = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+    bg.fill((0, 0, 0, 160))
+    controls_bg_surf = bg
 disc_base = None
 try:
-    disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
+    disc_img = pygame.image.load('imgs/disc.png').convert()
     disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE)
 except Exception:
     disc_base = None
@@ -97,15 +109,57 @@ current_art_url = None
 album_art_surf = None
 vinyl_surface = None
 disc_angle = 0.0
+is_playing_cached = False
+latest_art_url = None
+state_lock = threading.Lock()
+stop_polling = threading.Event()
+
+SPIN_DEG_PER_SEC = 80.0
 
 def refresh_vinyl():
     global current_art_url, album_art_surf, vinyl_surface
-    url = spotify.get_disc_image()
+    with state_lock:
+        url = latest_art_url
     if url and url != current_art_url:
         current_art_url = url
         album_art_surf = load_album_art(url, ALBUM_ART_SIZE)
     if disc_base:
         vinyl_surface = make_vinyl_surface(disc_base, album_art_surf, DISC_SIZE)
+
+def polling_worker(playback_interval_s=1.0, art_interval_s=5.0):
+    global is_playing_cached, latest_art_url
+    next_playback = 0.0
+    next_art = 0.0
+    while not stop_polling.is_set():
+        now = time.monotonic()
+        did_work = False
+
+        if now >= next_playback:
+            did_work = True
+            next_playback = now + playback_interval_s
+            try:
+                playing = bool(spotify.isPlaying())
+                with state_lock:
+                    is_playing_cached = playing
+            except Exception:
+                pass
+
+        if now >= next_art:
+            did_work = True
+            next_art = now + art_interval_s
+            try:
+                url = spotify.get_disc_image()
+                if url:
+                    with state_lock:
+                        latest_art_url = url
+            except Exception:
+                pass
+
+        if not did_work:
+            stop_polling.wait(0.05)
+
+poll_thread = threading.Thread(target=polling_worker, daemon=True)
+poll_thread.start()
 
 refresh_vinyl()
 
@@ -115,7 +169,7 @@ SPACING = 40
 
 surfaces = [
     controls.get('previous'),
-    controls.get('pause') if spotify.isPlaying() else controls.get('play'),
+    controls.get('pause') if is_playing_cached else controls.get('play'),
     controls.get('skip')
 ]
 
@@ -141,22 +195,47 @@ def layout_controls(surfaces, center_x, y, spacing=40):
 
 
 control_rects = layout_controls(surfaces, CENTER_X, CONTROL_Y, SPACING)
+controls_bg_surf = None
+controls_bg_pos = (0, 0)
+
+def rebuild_controls_bg():
+    global controls_bg_surf, controls_bg_pos
+    valid_rects = [r for r in control_rects if r]
+    if not valid_rects:
+        controls_bg_surf = None
+        return
+    left   = min(r.left  for r in valid_rects) - 16
+    right  = max(r.right for r in valid_rects) + 16
+    top    = min(r.top   for r in valid_rects) - 12
+    bottom = max(r.bottom for r in valid_rects) + 12
+    bg_w = right - left
+    bg_h = bottom - top
+    bg = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+    bg.fill((0, 0, 0, 160))
+    controls_bg_surf = bg
+    controls_bg_pos = (left, top)
+
+rebuild_controls_bg()
 
 running = True
 clock = pygame.time.Clock()
 art_refresh_timer = 0
 ART_REFRESH_INTERVAL = 5000
+playback_refresh_timer = 0
+PLAYBACK_REFRESH_INTERVAL = 1000
 
 while running:
-    dt = clock.tick(30)
+    dt = clock.tick(60)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            if spotify.isPlaying():
+            if is_playing_cached:
                 spotify.pause()
+            stop_polling.set()
             running = False
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                stop_polling.set()
                 running = False
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
@@ -165,46 +244,51 @@ while running:
                     if not spotify.isConnected():
                         continue
                     if i == 1:
-                        if not spotify.isPlaying() and controls.get('pause'):
+                        if not is_playing_cached and controls.get('pause'):
                             surfaces[1] = controls.get('pause')
                             spotify.play()
+                            is_playing_cached = True
                         else:
                             surfaces[1] = controls.get('play')
                             spotify.pause()
+                            is_playing_cached = False
                         control_rects = layout_controls(surfaces, CENTER_X, CONTROL_Y, SPACING)
+                        rebuild_controls_bg()
                     elif i == 0:
                         spotify.skip_previous()
-                        refresh_vinyl()
                     elif i == 2:
                         spotify.skip_next()
-                        refresh_vinyl()
-
+                        
     art_refresh_timer += dt
     if art_refresh_timer >= ART_REFRESH_INTERVAL:
         art_refresh_timer = 0
         refresh_vinyl()
 
-    if spotify.isPlaying():
-        disc_angle = (disc_angle + 4.5) % 360
+    playback_refresh_timer += dt
+    if playback_refresh_timer >= PLAYBACK_REFRESH_INTERVAL:
+        playback_refresh_timer = 0
+        with state_lock:
+            playing_now = is_playing_cached
+        desired = controls.get('pause') if playing_now else controls.get('play')
+        if desired and surfaces[1] is not desired:
+            surfaces[1] = desired
+            control_rects = layout_controls(surfaces, CENTER_X, CONTROL_Y, SPACING)
+            rebuild_controls_bg()
+        refresh_vinyl()
+
+    with state_lock:
+        playing_now = is_playing_cached
+    if playing_now:
+        disc_angle = (disc_angle + SPIN_DEG_PER_SEC * (dt / 1000.0)) % 360
 
     screen.fill((30, 30, 30))
 
     if vinyl_surface:
-        rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
-        rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-        screen.blit(rotated, rot_rect.topleft)
+        rotated = pygame.transform.rotate(vinyl_surface, disc_angle)
+        screen.blit(rotated, rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
 
-    valid_rects = [r for r in control_rects if r]
-    if valid_rects:
-        left   = min(r.left  for r in valid_rects) - 16
-        right  = max(r.right for r in valid_rects) + 16
-        top    = min(r.top   for r in valid_rects) - 12
-        bottom = max(r.bottom for r in valid_rects) + 12
-        bg_w = right - left
-        bg_h = bottom - top
-        bg_surf = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
-        bg_surf.fill((0, 0, 0, 160))
-        screen.blit(bg_surf, (left, top))
+    if controls_bg_surf:
+        screen.blit(controls_bg_surf, controls_bg_pos)
 
     for s, r in zip(surfaces, control_rects):
         if s and r:
