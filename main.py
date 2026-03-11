@@ -83,10 +83,7 @@ def load_control_images(size=(64, 64)):
 
 controls = load_control_images(size=(80, 80))
 
-# --- KEY CHANGE: rotate a smaller disc surface, then scale up ---
-# Rotating 1080x1080 every frame is very slow. 600x600 is ~3x faster to rotate.
-DISC_RENDER_SIZE = 600
-DISC_SIZE = (DISC_RENDER_SIZE, DISC_RENDER_SIZE)
+DISC_SIZE = (WIDTH, HEIGHT)
 
 disc_base = None
 try:
@@ -95,7 +92,7 @@ try:
 except Exception:
     disc_base = None
 
-ALBUM_ART_SIZE = int(DISC_RENDER_SIZE * 0.38)
+ALBUM_ART_SIZE = int(min(WIDTH, HEIGHT) * 0.38)
 current_art_url = None
 album_art_surf = None
 vinyl_surface = None
@@ -204,12 +201,13 @@ while running:
 
     if spotify.isPlaying():
         disc_angle = (disc_angle + 135 * (dt / 1000)) % 360
+
     screen.fill((30, 30, 30))
 
     if vinyl_surface:
         rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
-        scaled = pygame.transform.scale(rotated, (WIDTH, HEIGHT))
-        screen.blit(scaled, (0, 0))
+        rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        screen.blit(rotated, rot_rect.topleft)
 
     if controls_bg:
         screen.blit(controls_bg, controls_bg_pos)
