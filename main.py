@@ -46,17 +46,17 @@ def make_vinyl_surface(disc_surface, album_surf, disc_size):
         vinyl.blit(album_surf, (x, y))
 
     center = (disc_size[0] // 2, disc_size[1] // 2)
-    pygame.draw.circle(vinyl, (20, 20, 20), center, 18)
-    pygame.draw.circle(vinyl, (40, 40, 40), center, 18, 2)
+    pygame.draw.circle(vinyl, (20, 20, 20, 255), center, 18)
+    pygame.draw.circle(vinyl, (40, 40, 40, 255), center, 18, 2)
 
-    return vinyl.convert_alpha()
+    return vinyl
 
 
 pygame.init()
 pygame.mixer.quit()
 
 WIDTH, HEIGHT = 1080, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Spotify Record Player")
 
 
@@ -84,11 +84,10 @@ def load_control_images(size=(64, 64)):
 controls = load_control_images(size=(80, 80))
 
 DISC_SIZE = (WIDTH, HEIGHT)
-
 disc_base = None
 try:
     disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
-    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE).convert_alpha()
+    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE)
 except Exception:
     disc_base = None
 
@@ -147,22 +146,8 @@ clock = pygame.time.Clock()
 art_refresh_timer = 0
 ART_REFRESH_INTERVAL = 5000
 
-def build_controls_bg(control_rects):
-    valid_rects = [r for r in control_rects if r]
-    if not valid_rects:
-        return None, (0, 0)
-    left   = min(r.left  for r in valid_rects) - 16
-    right  = max(r.right for r in valid_rects) + 16
-    top    = min(r.top   for r in valid_rects) - 12
-    bottom = max(r.bottom for r in valid_rects) + 12
-    bg_surf = pygame.Surface((right - left, bottom - top), pygame.SRCALPHA)
-    bg_surf.fill((0, 0, 0, 160))
-    return bg_surf, (left, top)
-
-controls_bg, controls_bg_pos = build_controls_bg(control_rects)
-
 while running:
-    dt = clock.tick(60)
+    dt = clock.tick(30)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -186,7 +171,6 @@ while running:
                             surfaces[1] = controls.get('play')
                             spotify.pause()
                         control_rects = layout_controls(surfaces, CENTER_X, CONTROL_Y, SPACING)
-                        controls_bg, controls_bg_pos = build_controls_bg(control_rects)
                     elif i == 0:
                         spotify.skip_previous()
                         refresh_vinyl()
@@ -200,7 +184,7 @@ while running:
         refresh_vinyl()
 
     if spotify.isPlaying():
-        disc_angle = (disc_angle + 33 * (dt / 1000)) % 360
+        disc_angle = (disc_angle + 4.5) % 360
 
     screen.fill((30, 30, 30))
 
@@ -209,8 +193,17 @@ while running:
         rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         screen.blit(rotated, rot_rect.topleft)
 
-    if controls_bg:
-        screen.blit(controls_bg, controls_bg_pos)
+    valid_rects = [r for r in control_rects if r]
+    if valid_rects:
+        left   = min(r.left  for r in valid_rects) - 16
+        right  = max(r.right for r in valid_rects) + 16
+        top    = min(r.top   for r in valid_rects) - 12
+        bottom = max(r.bottom for r in valid_rects) + 12
+        bg_w = right - left
+        bg_h = bottom - top
+        bg_surf = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+        bg_surf.fill((0, 0, 0, 160))
+        screen.blit(bg_surf, (left, top))
 
     for s, r in zip(surfaces, control_rects):
         if s and r:
