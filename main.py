@@ -41,13 +41,16 @@ def make_vinyl_surface(disc_surface, album_surf, disc_size):
 
     if album_surf:
         art_size = album_surf.get_width()
+        flat = pygame.Surface((art_size, art_size))
+        flat.fill((30, 30, 30))
+        flat.blit(album_surf, (0, 0))
         x = (disc_size[0] - art_size) // 2
         y = (disc_size[1] - art_size) // 2
-        vinyl.blit(album_surf, (x, y))
+        vinyl.blit(flat, (x, y))
 
     center = (disc_size[0] // 2, disc_size[1] // 2)
-    pygame.draw.circle(vinyl, (20, 20, 20, 255), center, 18)
-    pygame.draw.circle(vinyl, (40, 40, 40, 255), center, 18, 2)
+    pygame.draw.circle(vinyl, (20, 20, 20), center, 18)
+    pygame.draw.circle(vinyl, (40, 40, 40), center, 18, 2)
 
     return vinyl.convert()
 
@@ -87,7 +90,7 @@ DISC_SIZE = (WIDTH, HEIGHT)
 
 disc_base = None
 try:
-    disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
+    disc_img = pygame.image.load('imgs/disc.png').convert()
     disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE).convert()
 except Exception:
     disc_base = None
@@ -95,27 +98,17 @@ except Exception:
 ALBUM_ART_SIZE = int(min(WIDTH, HEIGHT) * 0.38)
 current_art_url = None
 album_art_surf = None
-vinyl_frames = []
+vinyl_surface = None
 disc_angle = 0.0
-FRAME_COUNT = 360
-
-def build_frames(vinyl_surface):
-    frames = []
-    for i in range(FRAME_COUNT):
-        angle = i * (360 / FRAME_COUNT)
-        rotated = pygame.transform.rotate(vinyl_surface, -angle)
-        frames.append(rotated)
-    return frames
 
 def refresh_vinyl():
-    global current_art_url, album_art_surf, vinyl_frames
+    global current_art_url, album_art_surf, vinyl_surface
     url = spotify.get_disc_image()
     if url and url != current_art_url:
         current_art_url = url
         album_art_surf = load_album_art(url, ALBUM_ART_SIZE)
     if disc_base:
         vinyl_surface = make_vinyl_surface(disc_base, album_art_surf, DISC_SIZE)
-        vinyl_frames = build_frames(vinyl_surface)
 
 refresh_vinyl()
 
@@ -214,9 +207,8 @@ while running:
 
     screen.fill((30, 30, 30))
 
-    if vinyl_frames:
-        frame_idx = int(disc_angle) % FRAME_COUNT
-        rotated = vinyl_frames[frame_idx]
+    if vinyl_surface:
+        rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
         rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         screen.blit(rotated, rot_rect.topleft)
 
