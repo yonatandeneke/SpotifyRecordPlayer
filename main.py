@@ -56,7 +56,7 @@ pygame.init()
 pygame.mixer.quit()
 
 WIDTH, HEIGHT = 1080, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
 pygame.display.set_caption("Spotify Record Player")
 
 
@@ -83,34 +83,29 @@ def load_control_images(size=(64, 64)):
 
 controls = load_control_images(size=(80, 80))
 
-INNER_SIZE = 500
+DISC_SIZE = (WIDTH, HEIGHT)
 
-disc_bg = None
+disc_base = None
 try:
     disc_img = pygame.image.load('imgs/disc.png').convert_alpha()
-    disc_bg = pygame.transform.smoothscale(disc_img, (WIDTH, HEIGHT))
+    disc_base = pygame.transform.smoothscale(disc_img, DISC_SIZE)
 except Exception:
-    disc_bg = None
+    disc_base = None
 
-ALBUM_ART_SIZE = int(INNER_SIZE * 0.38)
+ALBUM_ART_SIZE = int(min(WIDTH, HEIGHT) * 0.38)
 current_art_url = None
 album_art_surf = None
-inner_surface = None
+vinyl_surface = None
 disc_angle = 0.0
 
 def refresh_vinyl():
-    global current_art_url, album_art_surf, inner_surface
+    global current_art_url, album_art_surf, vinyl_surface
     url = spotify.get_disc_image()
     if url and url != current_art_url:
         current_art_url = url
         album_art_surf = load_album_art(url, ALBUM_ART_SIZE)
-    inner_size = (INNER_SIZE, INNER_SIZE)
-    if disc_bg:
-        inner_src = pygame.transform.smoothscale(disc_bg, inner_size)
-    else:
-        inner_src = pygame.Surface(inner_size, pygame.SRCALPHA)
-        inner_src.fill((20, 20, 20, 255))
-    inner_surface = make_vinyl_surface(inner_src, album_art_surf, inner_size)
+    if disc_base:
+        vinyl_surface = make_vinyl_surface(disc_base, album_art_surf, DISC_SIZE)
 
 refresh_vinyl()
 
@@ -209,11 +204,8 @@ while running:
 
     screen.fill((30, 30, 30))
 
-    if disc_bg:
-        screen.blit(disc_bg, (0, 0))
-
-    if inner_surface:
-        rotated = pygame.transform.rotate(inner_surface, -disc_angle)
+    if vinyl_surface:
+        rotated = pygame.transform.rotate(vinyl_surface, -disc_angle)
         rot_rect = rotated.get_rect(center=(WIDTH // 2, HEIGHT // 2))
         screen.blit(rotated, rot_rect.topleft)
 
